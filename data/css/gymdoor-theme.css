@@ -160,6 +160,36 @@ a.article:hover {
     color: #333333;
 }
 
+/* Link buttons (Backup, Restore, Sync Time) */
+.btn-link,
+button.btn-link,
+label.btn-link,
+a.btn-link {
+    color: #2B58A8 !important;
+    background-color: #FFFFFF;
+    border: 1px solid #2B58A8;
+    border-radius: 4px;
+    font-weight: 600;
+    padding: 6px 14px;
+    text-decoration: none !important;
+    display: inline-block;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-link:hover,
+.btn-link:focus,
+button.btn-link:hover,
+label.btn-link:hover,
+a.btn-link:hover {
+    color: #FFFFFF !important;
+    background-color: #2B58A8;
+    border-color: #2B58A8;
+    text-decoration: none !important;
+}
+
 /* ── Cards / panels ──────────────────────────────────────── */
 .panel,
 .panel-default {
