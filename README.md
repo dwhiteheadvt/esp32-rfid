@@ -151,9 +151,36 @@ When you run ```platformio run``` for the first time, it will download the toolc
 
 * ```platformio run``` - process/build all targets
 * ```platformio run -e wifi -t upload``` - process/build and flash just the generic ESP32 target
+* ```platformio run -e wifi -t uploadfs``` - build and upload the LittleFS filesystem image (web UI files from `/data`)
 * ```platformio run -t clean``` - clean project (remove compiled files)
 
 The resulting (built) image(s) can be found in the directory ```/bin``` created during the build process.
+
+### Flashing a New ESP32
+
+This project uses **LittleFS** for storing the web UI (`/data` folder). The firmware and filesystem are **separate flash operations** — both are required on a fresh board.
+
+**Step 1 — Flash the firmware:**
+```
+platformio run -e wifi -t upload
+```
+
+**Step 2 — Upload the filesystem image:**
+```
+platformio run -e wifi -t uploadfs
+```
+
+> [!IMPORTANT]
+> Without the filesystem upload, the ESP32 will boot but the web interface will not load.
+> Replace `wifi` with your target environment (e.g. `ethernet-DTWONDER`, `wifi-APWIKOGER`, etc.).
+
+### Updating an Existing Board
+
+| What changed | Command |
+|---|---|
+| Source code only (`src/`) | `platformio run -e wifi -t upload` |
+| Web UI only (`data/`) | `platformio run -e wifi -t uploadfs` |
+| Both | Run both commands above |
 
 [:top:](#index)
 
