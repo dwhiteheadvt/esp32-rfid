@@ -16,19 +16,19 @@ var config = {
     "command": "configfile",
     "network": {
         "bssid": "",
-        "ssid": "esp32-rfid",
-        "wmode": 1,
+        "ssid": "whitehead917",
+        "wmode": 0,
         "hide": 0,
-        "pswd": "",
+        "pswd": "buddy2019",
         "offtime": 0,
-        "dhcp": 1,
-        "ip": "",
-        "subnet": "",
-        "gateway": "",
-        "dns": "",
+        "dhcp": 0,
+        "ip": "192.168.0.32",
+        "subnet": "255.255.255.0",
+        "gateway": "192.168.0.1",
+        "dns": "8.8.8.8",
         "apip": "192.168.4.1",
         "apsubnet": "255.255.255.0",
-        "fallbackmode": 0,
+        "fallbackmode": 1,
         "dhcpeth": 1,
         "ipeth": "",
         "subneteth": "",
@@ -2324,14 +2324,8 @@ function logout() {
   return false;
 }
 
-var wsReconnectTimeout = null;
-
 function wsConnectionActive() {
   wsConnectionPresent = true;
-  if (wsReconnectTimeout) {
-    clearTimeout(wsReconnectTimeout);
-    wsReconnectTimeout = null;
-  }
   $("#ws-connection-status").slideUp();
   if (!gotInitialData) {
     sendWebsocket("{\"command\":\"status\"}");
@@ -2343,20 +2337,17 @@ function wsConnectionActive() {
 function wsConnectionClosed() {
   wsConnectionPresent = false;
   $("#ws-connection-status").slideDown();
-  if (!wsReconnectTimeout) {
-    wsReconnectTimeout = setTimeout(function() {
-      wsReconnectTimeout = null;
-      connectWS();
-    }, 2000);
+  connectWS();
+}
+
+function keepWSConnectionOpen() {
+  if (!wsConnectionPresent) {
+    setTimeout(connectWS, 5000);
   }
 }
 
 function connectWS() {
-  if (websock && (websock.readyState === WebSocket.OPEN || websock.readyState === WebSocket.CONNECTING)) {
-    if (websock.readyState === WebSocket.OPEN) {
-      wsConnectionPresent = true;
-      $("#ws-connection-status").slideUp();
-    }
+  if(wsConnectionPresent) {
     return;
   }
 
@@ -2376,6 +2367,8 @@ function connectWS() {
   websock.onclose = function(evt) {
     wsConnectionClosed();
   };
+
+  keepWSConnectionOpen();
 }
 
 function upload() {
