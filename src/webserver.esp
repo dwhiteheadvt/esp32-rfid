@@ -66,45 +66,76 @@ void setupWebServer() {
         }
     });
 
-    // 1. Serve static files from LittleFS if present
-    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+    // Explicit handlers: check LittleFS first (serves customized files),
+    // fall back to PROGMEM only when LittleFS doesn't have the file (first boot
+    // before uploadfs, or emergency recovery).
 
-    // 2. Built-in PROGMEM fallbacks if LittleFS is empty
     server.on("/fonts/glyphicons-halflings-regular.woff", HTTP_GET, [](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "font/woff", glyphicons_halflings_regular_woff_gz, glyphicons_halflings_regular_woff_gz_len);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        if (LittleFS.exists("/fonts/glyphicons-halflings-regular.woff")) {
+            request->send(LittleFS, "/fonts/glyphicons-halflings-regular.woff", "font/woff");
+        } else {
+            AsyncWebServerResponse *response = request->beginResponse_P(200, "font/woff", glyphicons_halflings_regular_woff_gz, glyphicons_halflings_regular_woff_gz_len);
+            response->addHeader("Content-Encoding", "gzip");
+            request->send(response);
+        }
     });
     server.on("/css/required.css", HTTP_GET, [](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/css", required_css_gz, required_css_gz_len);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        if (LittleFS.exists("/css/required.css")) {
+            request->send(LittleFS, "/css/required.css", "text/css");
+        } else {
+            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/css", required_css_gz, required_css_gz_len);
+            response->addHeader("Content-Encoding", "gzip");
+            request->send(response);
+        }
     });
     server.on("/js/required.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", required_js_gz, required_js_gz_len);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        if (LittleFS.exists("/js/required.js")) {
+            request->send(LittleFS, "/js/required.js", "text/javascript");
+        } else {
+            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", required_js_gz, required_js_gz_len);
+            response->addHeader("Content-Encoding", "gzip");
+            request->send(response);
+        }
     });
     server.on("/js/esprfid.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", esprfid_js_gz, esprfid_js_gz_len);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        if (LittleFS.exists("/js/esprfid.js")) {
+            request->send(LittleFS, "/js/esprfid.js", "text/javascript");
+        } else {
+            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", esprfid_js_gz, esprfid_js_gz_len);
+            response->addHeader("Content-Encoding", "gzip");
+            request->send(response);
+        }
     });
     server.on("/js/boards.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", boards_js_gz, boards_js_gz_len);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        if (LittleFS.exists("/js/boards.js")) {
+            request->send(LittleFS, "/js/boards.js", "text/javascript");
+        } else {
+            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", boards_js_gz, boards_js_gz_len);
+            response->addHeader("Content-Encoding", "gzip");
+            request->send(response);
+        }
     });
     server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        if (LittleFS.exists("/index.html")) {
+            request->send(LittleFS, "/index.html", "text/html");
+        } else {
+            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
+            response->addHeader("Content-Encoding", "gzip");
+            request->send(response);
+        }
     });
     server.on("/esprfid.htm", HTTP_GET, [](AsyncWebServerRequest *request) {
-        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", esprfid_htm_gz, esprfid_htm_gz_len);
-        response->addHeader("Content-Encoding", "gzip");
-        request->send(response);
+        if (LittleFS.exists("/esprfid.htm")) {
+            request->send(LittleFS, "/esprfid.htm", "text/html");
+        } else {
+            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", esprfid_htm_gz, esprfid_htm_gz_len);
+            response->addHeader("Content-Encoding", "gzip");
+            request->send(response);
+        }
     });
+
+    // Catch-all for any other LittleFS files (gymdoor-theme.css, img/logo.png, etc.)
+    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
     server.rewrite("/", "/index.html");
 
