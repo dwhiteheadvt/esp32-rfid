@@ -42,6 +42,16 @@ void onWifiGotIP(WiFiEvent_t event, WiFiEventInfo_t info)
 #endif
 	wifiReconnectTimer.detach();
 	ledWifiOn();
+	if (config.deviceHostname && strlen(config.deviceHostname) > 0)
+	{
+		if (MDNS.begin(config.deviceHostname))
+		{
+			MDNS.addService("http", "tcp", 80);
+#ifdef DEBUG
+			Serial.printf("[ INFO ] mDNS responder started: http://%s.local\n", config.deviceHostname);
+#endif
+		}
+	}
 	connectToMqtt();
 }
 
