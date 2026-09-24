@@ -13,90 +13,18 @@ var numRelays=1;
 var theCurrentLogFile ="";
 
 var config = {
-    "command": "configfile",
-    "network": {
-        "bssid": "",
-        "ssid": "whitehead917",
-        "wmode": 0,
-        "hide": 0,
-        "pswd": "buddy2019",
-        "offtime": 0,
-        "dhcp": 0,
-        "ip": "192.168.0.32",
-        "subnet": "255.255.255.0",
-        "gateway": "192.168.0.1",
-        "dns": "8.8.8.8",
-        "apip": "192.168.4.1",
-        "apsubnet": "255.255.255.0",
-        "fallbackmode": 1,
-        "dhcpeth": 1,
-        "ipeth": "",
-        "subneteth": "",
-        "gatewayeth": "",
-        "dnseth": ""
-    },
-    "hardware": {
-        "readertype": 1,
-        "wgd0pin": 4,
-        "wgd1pin": 5,
-        "wifipin": 255,
-        "rtype": 1,
-        "ltype": 0,
-        "rpin": 4,
-        "rtime": 400,
-        "doorname": "Door",
-        "beeperpin" : 255,
-        "ledwaitingpin" : 255,
-        "openlockpin": 255,
-        "doorbellpin": 255,
-        "accessdeniedpin": 255,
-        "useridstoragemode": "hexadecimal",
-        "requirepincodeafterrfid": 1,
-        "allowpincodeonly": 0,
-        "removeparitybits": 1,
-        "doorstatpin": 255,
-        "maxOpenDoorTime": 0
-    },
-    "general": {
-        "hostnm": "gymdoor",
-        "restart": 0,
-        "pswd": "admin",
-        "openinghours": [
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-        ],
-        "openinghours2": [
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-          "111111111111111111111111",
-        ]
-    },
-    "mqtt": {
-        "enabled": 0,
-        "host": "",
-        "port": 1883,
-        "topic": "",
-        "autotopic": 0,
-        "user": "",
-        "pswd": "",
-        "syncrate": 180,
-        "mqttlog": 0
-    },
-    "ntp": {
-        "server": "pool.ntp.org",
-        "interval": 30,
-        "tzinfo": ""
-    }
+    "command": "configfile"
 };
+
+// Fetch configuration directly from /config.json (single source of truth)
+$.ajax({
+    url: "config.json",
+    dataType: "json",
+    async: false,
+    success: function(data) {
+        config = data;
+    }
+});
 
 var page = 1;
 var haspages;
