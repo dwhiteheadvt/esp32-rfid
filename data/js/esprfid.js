@@ -2324,8 +2324,14 @@ function logout() {
   return false;
 }
 
+var wsReconnectTimeout = null;
+
 function wsConnectionActive() {
   wsConnectionPresent = true;
+  if (wsReconnectTimeout) {
+    clearTimeout(wsReconnectTimeout);
+    wsReconnectTimeout = null;
+  }
   $("#ws-connection-status").slideUp();
   if (!gotInitialData) {
     sendWebsocket("{\"command\":\"status\"}");
@@ -2337,17 +2343,20 @@ function wsConnectionActive() {
 function wsConnectionClosed() {
   wsConnectionPresent = false;
   $("#ws-connection-status").slideDown();
-  connectWS();
-}
-
-function keepWSConnectionOpen() {
-  if (!wsConnectionPresent) {
-    setTimeout(connectWS, 5000);
+  if (!wsReconnectTimeout) {
+    wsReconnectTimeout = setTimeout(function() {
+      wsReconnectTimeout = null;
+      connectWS();
+    }, 2000);
   }
 }
 
 function connectWS() {
-  if(wsConnectionPresent) {
+  if (websock && (websock.readyState === WebSocket.OPEN || websock.readyState === WebSocket.CONNECTING)) {
+    if (websock.readyState === WebSocket.OPEN) {
+      wsConnectionPresent = true;
+      $("#ws-connection-status").slideUp();
+    }
     return;
   }
 
@@ -2367,8 +2376,6 @@ function connectWS() {
   websock.onclose = function(evt) {
     wsConnectionClosed();
   };
-
-  keepWSConnectionOpen();
 }
 
 function upload() {
