@@ -290,3 +290,8 @@ legend {
 #openinghours2 th:nth-child(2n) {
     background-color: #d8e4f5;
 }
+
+/* ── Hide annoying WebSocket connection warning alert ────── */
+#ws-connection-status {
+    display: none !important;
+}

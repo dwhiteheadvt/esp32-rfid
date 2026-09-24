@@ -2270,7 +2270,7 @@ function wsConnectionActive() {
 
 function wsConnectionClosed() {
   wsConnectionPresent = false;
-  $("#ws-connection-status").slideDown();
+  // $("#ws-connection-status").slideDown();
   connectWS();
 }
 
