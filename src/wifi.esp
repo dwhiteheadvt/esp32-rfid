@@ -115,6 +115,7 @@ bool ICACHE_FLASH_ATTR connectSTA(const char *ssid, const char *password, byte b
 {
 	bool useBSSID = false;
 	WiFi.mode(WIFI_STA);
+	WiFi.setSleep(false);
 	WiFi.persistent(false);
 
 	if (!config.dhcpEnabled)
