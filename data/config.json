@@ -1,4 +1,5 @@
 {
+  "command": "configfile",
   "network": {
     "bssid": "",
     "ssid": "whitehead917",
