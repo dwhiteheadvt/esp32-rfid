@@ -58,7 +58,7 @@ var config = {
         "maxOpenDoorTime": 0
     },
     "general": {
-        "hostnm": "esp32-rfid",
+        "hostnm": "gymdoor",
         "restart": 0,
         "pswd": "admin",
         "openinghours": [
