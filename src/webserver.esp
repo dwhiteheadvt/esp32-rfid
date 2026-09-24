@@ -1,14 +1,25 @@
 // 1. Make sure LittleFS is included at the top of your file
 #include <LittleFS.h>
 
+void listLittleFSFilesRecursive(File dir, int depth = 0) {
+    while (true) {
+        File entry = dir.openNextFile();
+        if (!entry) break;
+        for (int i = 0; i < depth; i++) Serial.print("  ");
+        if (entry.isDirectory()) {
+            Serial.printf("DIR : %s\n", entry.name());
+            listLittleFSFilesRecursive(entry, depth + 1);
+        } else {
+            Serial.printf("FILE: %s  SIZE: %d\n", entry.name(), entry.size());
+        }
+        entry.close();
+    }
+}
+
 void listLittleFSFiles() {
     File root = LittleFS.open("/");
-    File file = root.openNextFile();
     Serial.println("--- LittleFS Directory Contents ---");
-    while (file) {
-        Serial.printf("FILE: %s  SIZE: %d\n", file.name(), file.size());
-        file = root.openNextFile();
-    }
+    listLittleFSFilesRecursive(root);
     Serial.println("-----------------------------------");
 }
 
@@ -28,6 +39,30 @@ void setupWebServer() {
             return request->requestAuthentication();
         }
         request->send(200, "text/plain", "Success");
+    });
+
+    // Debug endpoint: lists all files in LittleFS
+    // Access at http://192.168.0.32/fsinfo
+    server.on("/fsinfo", HTTP_GET, [](AsyncWebServerRequest *request) {
+        String output = "{\n  \"files\": [\n";
+        std::function<void(File, bool&)> listDir = [&](File dir, bool &first) {
+            while (true) {
+                File entry = dir.openNextFile();
+                if (!entry) break;
+                if (!first) output += ",\n";
+                first = false;
+                output += "    {\"name\":\"" + String(entry.name()) + "\",\"size\":" + String(entry.size()) + ",\"dir\":" + (entry.isDirectory() ? "true" : "false") + "}";
+                if (entry.isDirectory()) listDir(entry, first);
+                entry.close();
+            }
+        };
+        File root = LittleFS.open("/");
+        bool first = true;
+        listDir(root, first);
+        output += "\n  ],\n";
+        output += "  \"totalBytes\":" + String(LittleFS.totalBytes()) + ",\n";
+        output += "  \"usedBytes\":" + String(LittleFS.usedBytes()) + "\n}";
+        request->send(200, "application/json", output);
     });
 
     server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
