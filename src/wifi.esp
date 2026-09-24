@@ -44,6 +44,7 @@ void onWifiGotIP(WiFiEvent_t event, WiFiEventInfo_t info)
 	ledWifiOn();
 	if (config.deviceHostname && strlen(config.deviceHostname) > 0)
 	{
+		MDNS.end();
 		if (MDNS.begin(config.deviceHostname))
 		{
 			MDNS.addService("http", "tcp", 80);
