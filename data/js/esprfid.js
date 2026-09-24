@@ -1637,7 +1637,13 @@ function restartESP() {
 }
 
 function socketMessageListener(evt) {
-  var obj = JSON.parse(evt.data);
+  var obj;
+  try {
+    obj = JSON.parse(evt.data);
+  } catch (e) {
+    console.error("WebSocket JSON parse error:", e, evt.data);
+    return;
+  }
   if (obj.hasOwnProperty("command")) {
     switch (obj.command) {
       case "status":
