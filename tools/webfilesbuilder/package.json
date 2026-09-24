@@ -7,9 +7,13 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "gulp"
   },
+"resolutions": {
+  "graceful-fs": "^4.2.11"
+},
   "author": "ESP32-RFID Developers",
   "license": "UNLICENSED",
   "dependencies": {
+    "graceful-fs": "^4.2.11",
     "gulp": "^3.9.1",
     "gulp-concat": "^2.6.1",
     "gulp-flatmap": "^1.0.2",

@@ -31,7 +31,7 @@ bool eth_connected = false;
 
 #include "Arduino.h"
 #include <WiFi.h>
-#include "WiFiEventHandler.h"
+// #include "WiFiEventHandler.h"
 #include <SPI.h>
 #include <ESPmDNS.h>
 #define ARDUINOJSON_DECODE_UNICODE 0
@@ -39,11 +39,11 @@ bool eth_connected = false;
 #include <FS.h>
 #include <LittleFS.h>
 #include "esp_flash.h" 
-#include <AsyncTCP.h>
+// #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <TimeLib.h>
 #include <Ticker.h>
-#include <AsyncMqttClient.h>
+#include <PsychicMqttClient.h>
 #include <Bounce2.h>
 //#include <esp_task_wdt.h>
 #include <Update.h>
@@ -87,7 +87,7 @@ WiegandNG wg;
 #include "webh/esprfid.htm.gz.h"
 #include "webh/index.html.gz.h"
 
-AsyncMqttClient mqttClient;
+PsychicMqttClient mqttClient;
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
 Ticker wsMessageTicker;
@@ -153,7 +153,7 @@ char* numberToHexStr(char* out, unsigned char* in, size_t length)
         return ptr;
 }
 
-void ICACHE_FLASH_ATTR setup()
+void setup()
 {
 #ifdef DEBUG
 	Serial.begin(115200);
@@ -442,6 +442,11 @@ void ICACHE_RAM_ATTR loop()
 
 	processWsQueue();
 
-	// clean unused websockets
-	ws.cleanupClients();
+	// clean unused websockets periodically
+	static unsigned long lastWsCleanup = 0;
+	if (currentMillis - lastWsCleanup >= 2000)
+	{
+		lastWsCleanup = currentMillis;
+		ws.cleanupClients();
+	}
 }

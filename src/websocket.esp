@@ -16,7 +16,16 @@ void addWsMessageToQueue(AsyncWebSocketClient *client, int messageSize)
 {
 	WsMessage *incomingMessage = new WsMessage;
 	incomingMessage->serializedMessage = (char *)malloc(messageSize);
-	strlcpy(incomingMessage->serializedMessage, (const char *)client->_tempObject, messageSize);
+	if (!incomingMessage->serializedMessage) {
+		delete incomingMessage;
+		if (client->_tempObject) {
+			free(client->_tempObject);
+			client->_tempObject = NULL;
+		}
+		return;
+	}
+	memcpy(incomingMessage->serializedMessage, client->_tempObject, messageSize - 1);
+	incomingMessage->serializedMessage[messageSize - 1] = '\0';
 	free(client->_tempObject);
 	client->_tempObject = NULL;
 
@@ -53,7 +62,7 @@ void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 		Serial.println(F("[ WARN ] Couldn't parse WebSocket message"));
 #endif
 		free(incomingMessage->serializedMessage);
-		free(incomingMessage);
+		delete incomingMessage;
 		return;
 	}
 	// Web Browser sends some commands, check which command is given
@@ -235,14 +244,21 @@ void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 		}
 	}
 	free(incomingMessage->serializedMessage);
-	free(incomingMessage);
+	delete incomingMessage;
 	yield();
 }
 
-// Handles WebSocket Events
-void ICACHE_FLASH_ATTR onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
+void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
 {
-	if (type == WS_EVT_ERROR)
+	if (type == WS_EVT_DISCONNECT)
+	{
+		if (client->_tempObject != NULL)
+		{
+			free(client->_tempObject);
+			client->_tempObject = NULL;
+		}
+	}
+	else if (type == WS_EVT_ERROR)
 	{
 #ifdef DEBUG
 		Serial.printf("[ WARN ] WebSocket[%s][%u] error(%u): %s\r\n", server->url(), client->id(), *((uint16_t *)arg), (char *)data);

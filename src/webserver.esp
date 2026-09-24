@@ -1,107 +1,120 @@
-void ICACHE_FLASH_ATTR setupWebServer() {
-	server.addHandler(&ws);
-	ws.onEvent(onWsEvent);
-	server.onNotFound([](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse(404, "text/plain", "Not found");
-		request->send(response);
-	});
-	server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse * response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
-		response->addHeader("Connection", "close");
-		request->send(response);
-	}, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-		if (!request->authenticate(httpUsername, config.httpPass)) {
-			return;
-		}
-		if (!index) {
-			//writeEvent("INFO", "updt", "Firmware update started", filename.c_str());
-			//Update.runAsync(true);
-			if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000)) {
-				//writeEvent("ERRO", "updt", "Not enough space to update","");
-				#ifdef DEBUG
-				Update.printError(Serial);
-				#endif
-			}
-		}
-		if (!Update.hasError()) {
-			if (Update.write(data, len) != len) {
-				//writeEvent("ERRO", "updt", "Writing to flash is failed", filename.c_str());
-				#ifdef DEBUG
-				Update.printError(Serial);
-				#endif
-			}
-		}
-		if (final) {
-			if (Update.end(true)) {
-				//writeEvent("INFO", "updt", "Firmware update is finished", "");
+// 1. Make sure LittleFS is included at the top of your file
+#include <LittleFS.h>
+
+void listLittleFSFiles() {
+    File root = LittleFS.open("/");
+    File file = root.openNextFile();
+    Serial.println("--- LittleFS Directory Contents ---");
+    while (file) {
+        Serial.printf("FILE: %s  SIZE: %d\n", file.name(), file.size());
+        file = root.openNextFile();
+    }
+    Serial.println("-----------------------------------");
+}
+
+void setupWebServer() {
+    listLittleFSFiles();
+
+    server.addHandler(&ws);
+    ws.onEvent(onWsEvent);
+
+    if (config.httpPass == NULL) {
+        config.httpPass = strdup("admin");
+    }
+
+    server.on("/login", HTTP_GET, [](AsyncWebServerRequest *request) {
+        String remoteIP = printIP(request->client()->remoteIP());
+        if (!request->authenticate(httpUsername, config.httpPass)) {
+            return request->requestAuthentication();
+        }
+        request->send(200, "text/plain", "Success");
+    });
+
+    server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
+        response->addHeader("Connection", "close");
+        request->send(response);
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+        if (!request->authenticate(httpUsername, config.httpPass)) {
+            return;
+        }
+        if (!index) {
+            if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000)) {
 #ifdef DEBUG
-				Serial.printf("[ UPDT ] Firmware update finished: %uB\n", index + len);
+                Update.printError(Serial);
 #endif
-				shouldReboot = !Update.hasError();
-			} else {
-				//writeEvent("ERRO", "updt", "Update is failed", "");
-				#ifdef DEBUG
-				Update.printError(Serial);
-				#endif
-			}
-		}
-	});
-	
-	server.on("/fonts/glyphicons-halflings-regular.woff", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "font/woff", glyphicons_halflings_regular_woff_gz, glyphicons_halflings_regular_woff_gz_len);
-		response->addHeader("Content-Encoding", "gzip");
-		request->send(response);
-	});
-	server.on("/css/required.css", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/css", required_css_gz, required_css_gz_len);
-		response->addHeader("Content-Encoding", "gzip");
-		request->send(response);
-	});
-	server.on("/js/required.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", required_js_gz, required_js_gz_len);
-		response->addHeader("Content-Encoding", "gzip");
-		request->send(response);
-	});
-	
-	server.on("/js/esprfid.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", esprfid_js_gz, esprfid_js_gz_len);
-		response->addHeader("Content-Encoding", "gzip");
-		request->send(response);
-	});
-
-	server.on("/js/boards.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", boards_js_gz, boards_js_gz_len);
-		response->addHeader("Content-Encoding", "gzip");
-		request->send(response);
-	});
-
-	server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
-		response->addHeader("Content-Encoding", "gzip");
-		request->send(response);
-	});
-
-	server.on("/esprfid.htm", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", esprfid_htm_gz, esprfid_htm_gz_len);
-		response->addHeader("Content-Encoding", "gzip");
-		request->send(response);
-	});
-
-	if (config.httpPass == NULL) {
-		config.httpPass = strdup("admin");
-	}
-	server.on("/login", HTTP_GET, [](AsyncWebServerRequest *request) {
-		String remoteIP = printIP(request->client()->remoteIP());
-		if (!request->authenticate(httpUsername, config.httpPass)) {
-			//writeEvent("WARN", "websrv", "New login attempt", remoteIP);
-			return request->requestAuthentication();
-		}
-		request->send(200, "text/plain", "Success");
-		//writeEvent("INFO", "websrv", "Login success!", remoteIP);
-	});
-	server.rewrite("/", "/index.html");
-	server.begin();
+            }
+        }
+        if (!Update.hasError()) {
+            if (Update.write(data, len) != len) {
 #ifdef DEBUG
-	Serial.println("[ INFO ] Webserver started");
+                Update.printError(Serial);
+#endif
+            }
+        }
+        if (final) {
+            if (Update.end(true)) {
+#ifdef DEBUG
+                Serial.printf("[ UPDT ] Firmware update finished: %uB\n", index + len);
+#endif
+                shouldReboot = !Update.hasError();
+            } else {
+#ifdef DEBUG
+                Update.printError(Serial);
+#endif
+            }
+        }
+    });
+
+    // 1. Serve static files from LittleFS if present
+    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+
+    // 2. Built-in PROGMEM fallbacks if LittleFS is empty
+    server.on("/fonts/glyphicons-halflings-regular.woff", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "font/woff", glyphicons_halflings_regular_woff_gz, glyphicons_halflings_regular_woff_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+    server.on("/css/required.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/css", required_css_gz, required_css_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+    server.on("/js/required.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", required_js_gz, required_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+    server.on("/js/esprfid.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", esprfid_js_gz, esprfid_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+    server.on("/js/boards.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", boards_js_gz, boards_js_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+    server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+    server.on("/esprfid.htm", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", esprfid_htm_gz, esprfid_htm_gz_len);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+    });
+
+    server.rewrite("/", "/index.html");
+
+    // 3. Catch-all 404 handler LAST
+    server.onNotFound([](AsyncWebServerRequest *request) {
+        request->send(404, "text/plain", "Not found");
+    });
+
+    server.begin();
+#ifdef DEBUG
+    Serial.println("[ INFO ] Webserver started");
 #endif
 }

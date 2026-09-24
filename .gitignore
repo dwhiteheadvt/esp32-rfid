@@ -89,3 +89,4 @@ bin/esp32-rfid-users.json
 ESP-Debug
 
 ethernet
+.DS_Store

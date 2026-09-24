@@ -18,7 +18,14 @@
 
 #ifdef DTWONDER
 // ETH_PHY_JL1101 for DTWONDER
+
+#ifndef ETH_PHY_JL1101
+  // Map it directly to the native LAN8720 enum type since they share register layouts
+  #define ETH_PHY_JL1101 ETH_PHY_LAN8720 
+#endif
+
 #define ETH_PHY_TYPE        ETH_PHY_JL1101
+
 #define ETH_CLK_MODE        ETH_CLOCK_GPIO17_OUT
 #define GPIO_RMII_PWR 		0
 #define ETH_PHY_POWER		0
@@ -55,7 +62,7 @@ void onEthConnect(WiFiEvent_t event, WiFiEventInfo_t inf0)
 
 void onEthDisconnect(WiFiEvent_t event, WiFiEventInfo_t inf0)
 {
-	if ( !ETH.connected() )
+	if ( !ETH.linkUp() )
 	{
 		return;
 	}
@@ -113,15 +120,15 @@ bool ICACHE_FLASH_ATTR connectETh()
 		ledWifiStatus();
 		delay(500);
 #ifdef DEBUG
-		if (ETH.connected())
+		if (ETH.linkUp())
 			Serial.print(F("."));
 #endif
-		if (ETH.connected())
+		if (ETH.linkUp())
 			break;
 	} while (millis() - now < timeout * 1000);
 
 	// We now out of the while loop, either time is out or we connected. check what happened
-	if (ETH.connected())
+	if (ETH.linkUp())
 	{
 		String data = ETH.localIP().toString();
 		writeEvent("INFO", "ETH", "EThernet is connected", data);

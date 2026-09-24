@@ -1,8 +1,8 @@
-struct Config {
-
-#ifdef GENERIC
-    #define MAX_NUM_RELAYS 4
+#ifndef MAX_NUM_RELAYS
+  #define MAX_NUM_RELAYS 4
 #endif
+
+struct Config {
 
 #ifdef APWIKOGER
     #define MAX_NUM_RELAYS 1

@@ -1,6 +1,6 @@
 void extern mqttPublishEvent(JsonDocument *root);
 
-void ICACHE_FLASH_ATTR writeEvent(String type, String src, String desc, String data)
+void writeEvent(String type, String src, String desc, String data)
 {
 	//DynamicJsonDocument root(512);
 	JsonDocument root;
@@ -27,7 +27,7 @@ void ICACHE_FLASH_ATTR writeEvent(String type, String src, String desc, String d
 #endif
 }
 
-void ICACHE_FLASH_ATTR writeLatest(String uid, String username, int acctype, int access = ACCESS_GRANTED)
+void writeLatest(String uid, String username, int acctype, int access = ACCESS_GRANTED)
 {
 	//DynamicJsonDocument root(512);
 	JsonDocument root;
@@ -49,7 +49,7 @@ size_t lastPos; // position counter for fast seek
 #define FILES_PER_PAGE 10.0
 #define MIN_LITTLEFS_BYTES 4096
 
-void ICACHE_FLASH_ATTR sendLogFile(int page, String fileName, int logFileType, AsyncWebSocketClient *client)
+void sendLogFile(int page, String fileName, int logFileType, AsyncWebSocketClient *client)
 {
 
 	// if we are reading the first page then we reset
@@ -122,7 +122,7 @@ void ICACHE_FLASH_ATTR sendLogFile(int page, String fileName, int logFileType, A
 	}
 }
 
-void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSocketClient *client)
+void logMaintenance(String action, String filename, AsyncWebSocketClient *client)
 {
 #ifdef DEBUG
 	Serial.printf("[DEBUG] Log Maintenance Action: %s on %s\n", action.c_str(), filename.c_str());
@@ -229,7 +229,7 @@ void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSo
 		client->text("{\"command\":\"result\",\"resultof\":\"logfileMaintenance\",\"result\": true}");
 	}
 }
-void ICACHE_FLASH_ATTR sendFileList(int page, AsyncWebSocketClient *client)
+void sendFileList(int page, AsyncWebSocketClient *client)
 {
 	JsonDocument root;
 	root["command"] = "listfiles";
@@ -272,14 +272,14 @@ void ICACHE_FLASH_ATTR sendFileList(int page, AsyncWebSocketClient *client)
 	}
 }
 
-void ICACHE_FLASH_ATTR sendEventLog(int page, String fileName, AsyncWebSocketClient *client)
+void sendEventLog(int page, String fileName, AsyncWebSocketClient *client)
 {
 	if (fileName.length() == 0)
 		fileName = "/eventlog.json";
 	sendLogFile(page, fileName, LOGTYPE_EVENTLOG, client);
 }
 
-void ICACHE_FLASH_ATTR sendLatestLog(int page, String fileName, AsyncWebSocketClient *client)
+void sendLatestLog(int page, String fileName, AsyncWebSocketClient *client)
 {
 	if (fileName.length() == 0)
 		fileName = "/latestlog.json";

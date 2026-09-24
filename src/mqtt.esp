@@ -33,46 +33,33 @@ void disconnectMqtt()
 #ifdef DEBUG
 	Serial.println("[ INFO ] Disconnecting MQTT");
 #endif
-	mqttClient.disconnect(true);
+	mqttClient.disconnect();
 }
 
-void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
+void onMqttDisconnect(esp_mqtt_event_handle_t event)
 {
-	String reasonstr = "";
-	switch (reason)
-	{
-	case (AsyncMqttClientDisconnectReason::TCP_DISCONNECTED):
-		reasonstr = "TCP_DISCONNECTED";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_UNACCEPTABLE_PROTOCOL_VERSION):
-		reasonstr = "MQTT_UNACCEPTABLE_PROTOCOL_VERSION";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_IDENTIFIER_REJECTED):
-		reasonstr = "MQTT_IDENTIFIER_REJECTED";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_SERVER_UNAVAILABLE):
-		reasonstr = "MQTT_SERVER_UNAVAILABLE";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_MALFORMED_CREDENTIALS):
-		reasonstr = "MQTT_MALFORMED_CREDENTIALS";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_NOT_AUTHORIZED):
-		reasonstr = "MQTT_NOT_AUTHORIZED";
-		break;
-	case (AsyncMqttClientDisconnectReason::ESP8266_NOT_ENOUGH_SPACE):
-		reasonstr = "ESP8266_NOT_ENOUGH_SPACE";
-		break;
-	default:
-		reasonstr = "Unknown";
-		break;
+	String reasonstr = "ESP_IDF_DISCONNECT_EVENT";
+	
+	// Optional: Check if we can pinpoint an explicit underlying error code
+	if (event != nullptr && event->error_handle != nullptr) {
+		if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+			reasonstr = "TCP_TRANSPORT_FAILED";
+		} else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
+			reasonstr = "CONNECTION_REFUSED_BY_BROKER";
+		}
 	}
+
 	writeEvent("WARN", "mqtt", "Disconnected from MQTT server", reasonstr);
 
 	if (WiFi.isConnected())
 	{
-		mqttReconnectTimer.once(60, connectToMqtt);
+		// Check your global project timer layout - if using standard Ticker:
+		// mqttReconnectTimer.once(60, connectToMqtt);
+		mqttReconnectTimer.once(60, []() { mqttClient.connect(); });
 	}
 }
+
+
 
 void mqttPublishEvent(JsonDocument *root, String topic)
 {
@@ -515,7 +502,8 @@ void deleteUserID(const char *uid)
 	}
 }
 
-void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total)
+// Change parameter layout back to receiving char pointer packets, lens, and index sizes
+void onMqttMessage(char* topic, char* payload, int len, int index, bool total)
 {
 	size_t n = 0;
 	size_t i = index;
@@ -524,7 +512,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 		n++;
 		i++;
 	}
-	if(index + len == total) {
+	if(total) {
 		mqttBuffer[i] = '\0';
 	} else {
 		return;
@@ -534,9 +522,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 	Serial.println(mqttBuffer);
 #endif
 
-	//DynamicJsonDocument mqttIncomingJson(2048);
 	JsonDocument mqttIncomingJson;
-	// cast to const char to avoid modification in place of mqttBuffer
 	auto error = deserializeJson(mqttIncomingJson, (const char *)mqttBuffer);
 	if (error)
 	{
@@ -547,8 +533,6 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 		return;
 	}
 
-	// Check if IP was sent with command because we only
-	// accept commands where sent IP is equal to device IP
 	if (!mqttIncomingJson.containsKey("doorip"))
 	{
 		return;
@@ -583,6 +567,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 #ifdef DEBUG
 		Serial.println("[ INFO ] No cmd key in MQTT message");
 #endif
+		delete incomingMessage;
 		return;
 	}
 	if (mqttIncomingJson.containsKey("uid")) {
@@ -595,6 +580,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 		strlcpy(incomingMessage->door, mqttIncomingJson["door"], sizeof(incomingMessage->door));
 	}
 	strlcpy(incomingMessage->serializedMessage, mqttBuffer, sizeof(mqttBuffer));
+	incomingMessage->nextMessage = NULL;
 
 	MqttMessage* lastMessage = mqttMessageQueue;
 	if(lastMessage == NULL)
@@ -609,6 +595,8 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 		lastMessage->nextMessage = incomingMessage;
 	}
 }
+
+
 
 void processMqttMessage(MqttMessage *incomingMessage)
 {
@@ -792,6 +780,8 @@ void onMqttConnect(bool sessionPresent)
 
 	String stopic(config.mqttTopic);
 	stopic = stopic + "/cmd";
+	
+	// PsychicMqttClient matching subscription scheme: subscribe(topic, qos)
 	mqttClient.subscribe(stopic.c_str(), 2);
 
 	if (config.mqttHA)
@@ -824,6 +814,7 @@ void onMqttConnect(bool sessionPresent)
 	}
 }
 
+
 void processMqttQueue()
 {
 	while (mqttMessageQueue != NULL)
@@ -831,6 +822,17 @@ void processMqttQueue()
 		MqttMessage *messageToProcess = mqttMessageQueue;
 		mqttMessageQueue = messageToProcess->nextMessage;
 		processMqttMessage(messageToProcess);
+	}
+}
+// Change parameter layout back to receiving a bool tracking state
+void onMqttDisconnect(bool sessionPresent)
+{
+	String reasonstr = "DISCONNECTED_FROM_HOST";
+	writeEvent("WARN", "mqtt", "Disconnected from MQTT server", reasonstr);
+
+	if (WiFi.isConnected())
+	{
+		mqttReconnectTimer.once(60, []() { mqttClient.connect(); });
 	}
 }
 
@@ -844,6 +846,7 @@ void setupMqtt()
 #ifdef DEBUG
 	Serial.println("[ INFO ] Trying to setup MQTT");
 #endif
+
 	if (config.mqttHA)
 	{
 		String stopic(config.mqttTopic);
@@ -853,33 +856,28 @@ void setupMqtt()
 		char *payloadLWT = strdup(payloadString.c_str());
 		mqttClient.setWill(topicLWT, 2, true, payloadLWT);
 	}
-	String mhsString = config.mqttHost;
-	
-	//IPAddress mqttip;
-	//mqttip.fromString(mhsString.c_str());
 
-	int Parts[4] = {0,0,0,0};
-	int Part = 0;
-	for ( int i=0; i<mhsString.length(); i++ )
-	{
-		char c = mhsString[i];
-		if ( c == '.' )
-		{
-			Part++;
-			continue;
-		}
-		Parts[Part] *= 10;
-		Parts[Part] += c - '0';
-	}
-	IPAddress mqttip( Parts[0], Parts[1], Parts[2], Parts[3] );
+	// Modern URI Construction pattern required by Espressif's Client Driver
+	String mqttUri = "mqtt://" + String(config.mqttHost) + ":" + String(config.mqttPort);
+	mqttClient.setServer(mqttUri.c_str());
 
-	mqttClient.setServer(mqttip, config.mqttPort);
+	// Set credentials safely if defined
 	mqttClient.setCredentials(config.mqttUser, config.mqttPass);
-	mqttClient.onDisconnect(onMqttDisconnect);
-	mqttClient.onPublish(onMqttPublish);
-	mqttClient.onSubscribe(onMqttSubscribe);
+	
+	// Bind connection and packet incoming loops
 	mqttClient.onConnect(onMqttConnect);
 	mqttClient.onMessage(onMqttMessage);
+	mqttClient.onPublish(onMqttPublish);
+
+	// Explicit inline lambda execution map fixes the unresolved overload error seamlessly
+	mqttClient.onDisconnect([](bool sessionPresent) {
+		// Route directly to your local file function
+		onMqttDisconnect(sessionPresent);
+	});
+	
+	// Placeholder compliance tracking for your configuration
+	mqttClient.onSubscribe([](int packetId) { /* Unused */ });
+
 #ifdef DEBUG
 	Serial.println("[ INFO ] MQTT Setup Finish");
 #endif
