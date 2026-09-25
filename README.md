@@ -1,6 +1,6 @@
 # ESP32-RFID - Access Control with ESP32 and Wiegand
 
-[This Project is a Port for ESP32 from ESP-RFID](https://github.com/esprfid/esp-rfid)
+> ℹ️ **Note:** This project is an ESP32 port based on the original [esp-rfid (stable branch)](https://github.com/esprfid/esp-rfid/tree/stable).
 
 
 Access Control system using a Wiegand RFID readers and Espressif's ESP32 Microcontroller. 
