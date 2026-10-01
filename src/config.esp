@@ -9,19 +9,20 @@ bool loadConfiguration(Config &config)
 		return false;
 	}
 	size_t size = configFile.size();
-	std::unique_ptr<char[]> buf(new char[size]);
-	configFile.readBytes(buf.get(), size);
+	std::unique_ptr<char[]> buf(new char[size + 1]);
+	size_t readLen = configFile.readBytes(buf.get(), size);
+	buf.get()[readLen] = '\0';
 #ifdef DEBUG
-	Serial.print(F("[ INFO ] config file: "));
-	Serial.println(configFile);
+	Serial.print(F("[ INFO ] config file size: "));
+	Serial.println(size);
 #endif
-	//DynamicJsonDocument json(2048);
 	JsonDocument json;
-	auto error = deserializeJson(json, buf.get(), size);
+	auto error = deserializeJson(json, buf.get(), readLen);
 	if (error)
 	{
 #ifdef DEBUG
-		Serial.println(F("[ WARN ] Failed to parse config file"));
+		Serial.print(F("[ WARN ] Failed to parse config file: "));
+		Serial.println(error.c_str());
 #endif
 		return false;
 	}

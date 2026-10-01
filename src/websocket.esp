@@ -96,7 +96,7 @@ void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 			{
 				len++;
 			}
-			f.println(incomingMessage->serializedMessage);
+			f.print(incomingMessage->serializedMessage);
 			f.close();
 			shouldReboot = true;
 #ifdef DEBUG
@@ -234,7 +234,7 @@ void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 		if (configFile)
 		{
 			size_t len = configFile.size();
-			AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
+			AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 			if (buffer)
 			{
 				configFile.readBytes((char *)buffer->get(), len);
