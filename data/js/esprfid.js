@@ -372,6 +372,14 @@ function savenetwork() {
       config.network.dns = document.getElementById("dnsadd").value;
       config.network.subnet = document.getElementById("subnet").value;
       config.network.gateway = document.getElementById("gateway").value;
+
+      var clientSubnet = config.network.ip.substring(0, config.network.ip.lastIndexOf('.'));
+      var gatewaySubnet = config.network.gateway.substring(0, config.network.gateway.lastIndexOf('.'));
+      if (clientSubnet !== gatewaySubnet) {
+        alert("Subnet Mismatch Warning:\nIP Address (" + config.network.ip + ") and Gateway (" + config.network.gateway + ") are on different subnets!\n\nBoth must start with the same prefix (e.g. " + gatewaySubnet + ".x).");
+        document.getElementById("ipaddress").focus();
+        return;
+      }
     }
   }
   config.network.wmode = wmode;
