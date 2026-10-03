@@ -1,5 +1,13 @@
 var version = "";
 
+window.addEventListener("error", function(e) {
+  try {
+    var msg = "JS error: " + e.message + " (line " + e.lineno + ")";
+    var b = document.querySelector("#ajaxcontent #usersbanner");
+    if (b) { b.insertAdjacentHTML("beforeend", "<pre style='color:red;text-align:left'>" + msg + "</pre>"); }
+  } catch (x) {}
+});
+
 var websock = null;
 var wsUri = "ws://" + window.location.host + "/ws";
 var utcSeconds;
@@ -41,11 +49,24 @@ var wsConnectionPresent = false;
 var esprfidcontent;
 var websocketMessagesToRetry = [];
 
-function sendWebsocket(msg) {
-  websock.send(msg);
+function sendWebsocket(msg, tries) {
+  tries = tries || 0;
+  if (websock && websock.readyState === 1) {
+    websock.send(msg);
+  } else if (tries < 50) {
+    setTimeout(function() { sendWebsocket(msg, tries + 1); }, 300);
+  } else {
+    console.error("WebSocket not open. ReadyState:", websock ? websock.readyState : "null");
+  }
 }
 
+
 function sendWebsocketWithRetry(msg) {
+  if (!websock || websock.readyState !== 1) {
+    // Socket still connecting (or reconnecting): try again shortly instead of throwing
+    setTimeout(function() { sendWebsocketWithRetry(msg); }, 300);
+    return;
+  }
   websock.send(msg);
   websocketMessagesToRetry.push({
     message: msg,
@@ -134,8 +155,8 @@ function listhardware() {
   document.getElementById("removeparitybits").checked = config.hardware.removeparitybits;
   document.getElementById("ledwaitingpin").value = config.hardware.ledwaitingpin;
   document.getElementById("beeperpin").value = config.hardware.beeperpin;
-  document.getElementById("readertype").value = config.hardware.readertype;
-  document.getElementById("wiegandbits").value = config.hardware.wiegandbits;
+  document.getElementById("readertype").value = config.hardware.readertype || 1;
+  document.getElementById("wiegandbits").value = config.hardware.wiegandbits || 26;
   document.getElementById("wg0pin").value = config.hardware.wgd0pin;
   document.getElementById("wg1pin").value = config.hardware.wgd1pin;
   document.getElementById("gpiorly").value = config.hardware.rpin;
@@ -153,6 +174,20 @@ function listhardware() {
   }
   handleReader();
   handleLock();
+  reinitPopovers();
+}
+
+function reinitPopovers() {
+  setTimeout(function() {
+    $("[data-toggle=\"popover\"]").popover("destroy");
+    $("[data-toggle=\"popover\"]").each(function() {
+      $(this).popover({
+        container: "body",
+        trigger: "hover focus click",
+        placement: "auto"
+      });
+    });
+  }, 100);
 }
 
 function listlog() {
@@ -184,45 +219,53 @@ function uncommited() {
   });
 }
 
+function safeParseInt(val, defaultVal) {
+  var parsed = parseInt(val, 10);
+  return isNaN(parsed) ? defaultVal : parsed;
+}
+
 function savehardware() {
-  config.hardware.readertype = parseInt(document.getElementById("readertype").value);
-  config.hardware.wiegandbits = parseInt(document.getElementById("wiegandbits").value);
-  config.hardware.wgd0pin = parseInt(document.getElementById("wg0pin").value);
-  config.hardware.wgd1pin = parseInt(document.getElementById("wg1pin").value);
-  config.hardware.useridstoragemode = document.getElementById("useridstoragemode").value;
-  config.hardware.requirepincodeafterrfid = document.getElementById("requirepincodeafterrfid").checked;
-  config.hardware.allowpincodeonly = document.getElementById("allowpincodeonly").checked;
-  config.hardware.removeparitybits = document.getElementById("removeparitybits").checked;
-  config.hardware.rtype = parseInt(document.getElementById("typerly").value);
-  config.hardware.ltype = parseInt(document.getElementById("lockType").value);
-  config.hardware.rpin = parseInt(document.getElementById("gpiorly").value);
-  config.hardware.rtime = parseInt(document.getElementById("delay").value);
-  config.hardware.wifipin = parseInt(document.getElementById("wifipin").value);
-  config.hardware.doorstatpin = parseInt(document.getElementById("doorstatpin").value);
-  config.hardware.maxOpenDoorTime = parseInt(document.getElementById("maxOpenDoorTime").value);
-  config.hardware.doorbellpin = parseInt(document.getElementById("doorbellpin").value);
-  config.hardware.openlockpin = parseInt(document.getElementById("openlockpin").value);
-  config.hardware.accessdeniedpin = parseInt(document.getElementById("accessdeniedpin").value);
-  config.hardware.beeperpin = parseInt(document.getElementById("beeperpin").value);
-  config.hardware.ledwaitingpin = parseInt(document.getElementById("ledwaitingpin").value);
-  config.hardware.doorname = document.getElementById("doorname").value;
-  config.hardware["numrelays"] = numRelays; 
+  config.hardware.readertype = safeParseInt(document.getElementById("readertype").value, 1);
+  config.hardware.wiegandbits = safeParseInt(document.getElementById("wiegandbits").value, 26);
+  config.hardware.wgd0pin = safeParseInt(document.getElementById("wg0pin").value, 16);
+  config.hardware.wgd1pin = safeParseInt(document.getElementById("wg1pin").value, 17);
+  config.hardware.useridstoragemode = document.getElementById("useridstoragemode").value || "hexadecimal";
+  config.hardware.requirepincodeafterrfid = document.getElementById("requirepincodeafterrfid").checked ? 1 : 0;
+  config.hardware.allowpincodeonly = document.getElementById("allowpincodeonly").checked ? 1 : 0;
+  config.hardware.removeparitybits = document.getElementById("removeparitybits").checked ? 1 : 0;
+  config.hardware.rtype = safeParseInt(document.getElementById("typerly").value, 0);
+  config.hardware.ltype = safeParseInt(document.getElementById("lockType").value, 0);
+  config.hardware.rpin = safeParseInt(document.getElementById("gpiorly").value, 26);
+  config.hardware.rtime = safeParseInt(document.getElementById("delay").value, 400);
+  config.hardware.wifipin = safeParseInt(document.getElementById("wifipin").value, 255);
+  config.hardware.doorstatpin = safeParseInt(document.getElementById("doorstatpin").value, 255);
+  config.hardware.maxOpenDoorTime = safeParseInt(document.getElementById("maxOpenDoorTime").value, 0);
+  config.hardware.doorbellpin = safeParseInt(document.getElementById("doorbellpin").value, 255);
+  config.hardware.openlockpin = safeParseInt(document.getElementById("openlockpin").value, 255);
+  config.hardware.accessdeniedpin = safeParseInt(document.getElementById("accessdeniedpin").value, 255);
+  config.hardware.beeperpin = safeParseInt(document.getElementById("beeperpin").value, 255);
+  config.hardware.ledwaitingpin = safeParseInt(document.getElementById("ledwaitingpin").value, 255);
+  config.hardware.doorname = document.getElementById("doorname").value || "Front Door";
+  config.hardware["numrelays"] = numRelays || 1; 
 
   for (var i = 2; i<=numRelays; i++)
   {
-    config.hardware["relay"+i].rpin = document.getElementById("gpiorly"+i).value;
-    config.hardware["relay"+i].ltype = document.getElementById("lockType"+i).value;
-    config.hardware["relay"+i].rtype = document.getElementById("typerly"+i).value;
-    config.hardware["relay"+i].rtime = document.getElementById("delay"+i).value;
-    config.hardware["relay"+i].doorname = document.getElementById("doorname"+i).value;
+    if (!config.hardware["relay"+i]) {
+      config.hardware["relay"+i] = {};
+    }
+    config.hardware["relay"+i].rpin = safeParseInt(document.getElementById("gpiorly"+i).value, 255);
+    config.hardware["relay"+i].ltype = safeParseInt(document.getElementById("lockType"+i).value, 0);
+    config.hardware["relay"+i].rtype = safeParseInt(document.getElementById("typerly"+i).value, 0);
+    config.hardware["relay"+i].rtime = safeParseInt(document.getElementById("delay"+i).value, 400);
+    config.hardware["relay"+i].doorname = document.getElementById("doorname"+i).value || ("Door " + i);
   }  
   uncommited();
 }
 
 function saventp() {
-  config.ntp.server = document.getElementById("ntpserver").value;
-  config.ntp.interval = parseInt(document.getElementById("intervals").value);
-  config.ntp.tzinfo = document.getElementById("DropDownTimezone").value;
+  config.ntp.server = document.getElementById("ntpserver").value || "pool.ntp.org";
+  config.ntp.interval = safeParseInt(document.getElementById("intervals").value, 60);
+  config.ntp.tzinfo = document.getElementById("DropDownTimezone").value || "EST5EDT,M3.2.0,M11.1.0";
 
   uncommited();
 }
@@ -264,11 +307,11 @@ function savegeneral() {
     return;
   }
   config.general.pswd = a;
-  config.general.hostnm = document.getElementById("hostname").value;
+  config.general.hostnm = document.getElementById("hostname").value || "esp32-rfid";
   if(document.getElementById("autorestart").value == "custom") {
-    config.general.restart = parseInt(document.getElementById("autorestart-custom").value);
+    config.general.restart = safeParseInt(document.getElementById("autorestart-custom").value, 0);
   } else {
-    config.general.restart = parseInt(document.getElementById("autorestart").value);
+    config.general.restart = safeParseInt(document.getElementById("autorestart").value, 0);
   }
   config.general.openinghours = extractOpeningHours();
   config.general.openinghours2 = extractOpeningHours2();
@@ -284,12 +327,12 @@ function savemqtt() {
       config.mqtt.enabled = 0;
     } 
     config.mqtt.host      = document.getElementById("mqtthost").value;
-    config.mqtt.port      = parseInt(document.getElementById("mqttport").value);
+    config.mqtt.port      = safeParseInt(document.getElementById("mqttport").value, 1883);
     config.mqtt.topic     = document.getElementById("mqtttopic").value;
     config.mqtt.autotopic = document.getElementById("mqttautotopic").checked;
     config.mqtt.user      = document.getElementById("mqttuser").value;
     config.mqtt.pswd      = document.getElementById("mqttpwd").value;
-    config.mqtt.syncrate  = document.getElementById("syncrate").value;
+    config.mqtt.syncrate  = safeParseInt(document.getElementById("syncrate").value, 180);
     config.mqtt.mqttlog   = 0;
     if (parseInt($("input[name=\"mqttlog\"]:checked").val()) === 1) {
         config.mqtt.mqttlog = 1;
@@ -372,21 +415,13 @@ function savenetwork() {
       config.network.dns = document.getElementById("dnsadd").value;
       config.network.subnet = document.getElementById("subnet").value;
       config.network.gateway = document.getElementById("gateway").value;
-
-      var clientSubnet = config.network.ip.substring(0, config.network.ip.lastIndexOf('.'));
-      var gatewaySubnet = config.network.gateway.substring(0, config.network.gateway.lastIndexOf('.'));
-      if (clientSubnet !== gatewaySubnet) {
-        alert("Subnet Mismatch Warning:\nIP Address (" + config.network.ip + ") and Gateway (" + config.network.gateway + ") are on different subnets!\n\nBoth must start with the same prefix (e.g. " + gatewaySubnet + ".x).");
-        document.getElementById("ipaddress").focus();
-        return;
-      }
     }
   }
   config.network.wmode = wmode;
   config.network.pswd = document.getElementById("wifipass").value;
 
   config.network.fallbackmode = document.forms.fallbackmodeForm.fallbackmode.value;
-  config.network.offtime = parseInt(document.getElementById("disable_wifi_after_seconds").value);
+  config.network.offtime = safeParseInt(document.getElementById("disable_wifi_after_seconds").value, 0);
   uncommited();
 }
 
@@ -423,7 +458,9 @@ function savenetworketh() {
 var formData = new FormData();
 
 function inProgress(callback) {
-  $("body").load("esprfid.htm #progresscontent", function(responseTxt, statusTxt, xhr) {
+  var progressHtml = $("#mastercontent #progresscontent").html();
+  $("body").html(progressHtml);
+  (function(statusTxt) {
     if (statusTxt === "success") {
       $(".progress").css("height", "40");
       $(".progress").css("font-size", "xx-large");
@@ -466,11 +503,14 @@ function inProgress(callback) {
 
       }
     }
-  }).hide().fadeIn();
+  })("success");
+  $("body").hide().fadeIn();
 }
 
 function commit() {
-  inProgress("commit");
+  // Send once, right away; the progress overlay below must not depend on it
+  sendWebsocket(JSON.stringify(config));
+  inProgress("commit-sent");
 }
 
 function handleAP() {
@@ -719,26 +759,55 @@ function isVisible(e) {
 }
 
 function listSCAN(obj) {
-  var elm = document.getElementById("usersbanner");
-  if (isVisible(elm)) {
-    if (obj.known === 1) {
-      $(".fooicon-remove").click();
-      document.querySelector("input.form-control[type=text]").value = obj.uid;
-      $(".fooicon-search").click();
-    } else {
-      $(".footable-add").click();
-      document.getElementById("uid").value = obj.uid;
-      document.getElementById("picctype").value = obj.type;
-      document.getElementById("username").value = obj.user;
-      document.getElementById("acctype").value = obj.acctype;
+  if (!obj || !obj.uid) return;
+  if (obj.known === 0) {
+    if (!$("#usersbanner").is(":visible")) {
+      getContent("#userscontent");
     }
+    setTimeout(function() {
+      if ($("#editor").length) {
+        $("#editor")[0].reset();
+      }
+      $("#editor-title").text("Add a new User");
+      if (document.getElementById("uid")) document.getElementById("uid").value = obj.uid;
+      if (document.getElementById("picctype")) document.getElementById("picctype").value = obj.type || "26";
+      if (document.getElementById("username")) document.getElementById("username").value = "New User";
+      if (document.getElementById("acctype")) document.getElementById("acctype").value = "99";
+      if (document.getElementById("validsince")) {
+        document.getElementById("validsince").value = new Date().toISOString().split('T')[0];
+      }
+      if (document.getElementById("validuntil")) {
+        document.getElementById("validuntil").value = "2037-12-31";
+      }
+      $("#editor-modal").modal("show");
+    }, 250);
+  } else if (obj.known === 1) {
+    if (!$("#usersbanner").is(":visible")) {
+      getContent("#userscontent");
+    }
+    setTimeout(function() {
+      $(".fooicon-remove").click();
+      var searchInput = document.querySelector("input.form-control[type=text]");
+      if (searchInput) {
+        searchInput.value = obj.uid;
+        $(".fooicon-search").click();
+      }
+    }, 250);
   }
+}
+
+function hideLoadingBar() {
+  $("#loading-img, #ajaxcontent #loading-img, .loading-img, #ajaxcontent .progress, #mastercontent #loading-img").hide();
+}
+
+function showLoadingBar() {
+  $("#ajaxcontent .loading-img, #ajaxcontent #loading-img, #ajaxcontent .progress").show();
 }
 
 function getnextpage(mode) {
   if (!backupstarted) {
-    document.getElementById("loadpages").innerHTML = "Loading " + page + "/" + haspages;
-    document.getElementById("loadpages").style.width = (((page+1) * 100) / (haspages-1)) + "%";
+    showLoadingBar();
+    $("#loadpages, #ajaxcontent #loadpages, #ajaxcontent .progress-bar").html("Loading " + page + "/" + haspages).css("width", (((page+1) * 100) / (haspages-1)) + "%");
   }
 
   // check received previous page
@@ -845,7 +914,10 @@ function listStats() {
   }
 }
 
+var currentContent = "";
+
 function getContent(contentname) {
+  currentContent = contentname;
   $("#dismiss").click();
   $(".overlay").fadeOut().promise().done(function() {
     var content = $(contentname).html();
@@ -897,7 +969,9 @@ function getContent(contentname) {
           break;
       }
       $("[data-toggle=\"popover\"]").popover({
-        container: "body"
+        container: "body",
+        trigger: "hover focus click",
+        placement: "auto"
       });
       $(this).hide().fadeIn();
     });
@@ -1317,8 +1391,24 @@ function initLatestLogTable() {
 }
 
 function initUserTable() {
+  $("#loading-img, #ajaxcontent #loading-img").hide();
   updateUserModalForm();
+  var existingFt = window.FooTable.get("#usertable");
+  if (existingFt) {
+    existingFt.destroy();
+  }
+  var uniqueData = [];
+  var seenUids = {};
+  for (var i = 0; i < data.length; i++) {
+    var item = data[i];
+    if (item && item.uid && !seenUids[item.uid]) {
+      seenUids[item.uid] = true;
+      uniqueData.push(item);
+    }
+  }
+  data = uniqueData;
   jQuery(function($) {
+    $("#loading-img, #ajaxcontent #loading-img").hide();
     var $modal = $("#editor-modal"),
       $editor = $("#editor"),
       $editorTitle = $("#editor-title"),
@@ -1347,7 +1437,7 @@ function initUserTable() {
           },
           {
             "name": "acctype",
-            "title": "Access Door " + config.hardware.doorname || "1",
+            "title": "Access Door " + (config && config.hardware && config.hardware.doorname ? config.hardware.doorname : "1"),
             "breakpoints": "xs",
             "parser": function(value) {
               if (value === 1) {
@@ -1422,18 +1512,17 @@ function initUserTable() {
             "title": "Valid Since",
             "breakpoints": "xs sm",
             "parser": function(value) {
+              if (!value) return "2000-01-01";
+              if (typeof value === "string" && value.indexOf("-") >= 0) return value;
+              var num = parseInt(value, 10);
+              if (isNaN(num) || num <= 0) return "2000-01-01";
               var comp = new Date();
-              var vuepoch;
-              if (value) {
-                value = Math.floor(value + ((comp.getTimezoneOffset() * 60) * -1));
-                vuepoch = new Date(value * 1000);
-              } else {
-                vuepoch = new Date(0);
-              }
-              var formatted = vuepoch.getFullYear() +
+              num = Math.floor(num + ((comp.getTimezoneOffset() * 60) * -1));
+              var vuepoch = new Date(num * 1000);
+              if (isNaN(vuepoch.getTime())) return "2000-01-01";
+              return vuepoch.getFullYear() +
                 "-" + twoDigits(vuepoch.getMonth() + 1) +
                 "-" + twoDigits(vuepoch.getDate());
-              return formatted;
             },
           },
           {
@@ -1441,13 +1530,17 @@ function initUserTable() {
             "title": "Valid Until",
             "breakpoints": "xs sm",
             "parser": function(value) {
+              if (!value) return "2037-12-31";
+              if (typeof value === "string" && value.indexOf("-") >= 0) return value;
+              var num = parseInt(value, 10);
+              if (isNaN(num) || num <= 0) return "2037-12-31";
               var comp = new Date();
-              value = Math.floor(value + ((comp.getTimezoneOffset() * 60) * -1));
-              var vuepoch = new Date(value * 1000);
-              var formatted = vuepoch.getFullYear() +
+              num = Math.floor(num + ((comp.getTimezoneOffset() * 60) * -1));
+              var vuepoch = new Date(num * 1000);
+              if (isNaN(vuepoch.getTime())) return "2037-12-31";
+              return vuepoch.getFullYear() +
                 "-" + twoDigits(vuepoch.getMonth() + 1) +
                 "-" + twoDigits(vuepoch.getDate());
-              return formatted;
             }
           }
         ],
@@ -1551,21 +1644,18 @@ function initUserTable() {
       sendWebsocket(JSON.stringify(datatosend));
       $modal.modal("hide");
     });
-  });
 
-  ft = FooTable.get('#usertable');
-  for (var i=2; i<= maxNumRelays; i++)
-  {
-    if (i<= numRelays) 
-    {
-      ft.columns.get("acctype"+i).visible=true;
+    if (ft && ft.columns) {
+      for (var i=2; i<= maxNumRelays; i++)
+      {
+        var col = ft.columns.get("acctype"+i);
+        if (col) {
+          col.visible = (i <= numRelays);
+        }
+      }
+      ft.draw();
     }
-    else
-    {
-      ft.columns.get("acctype"+i).visible=false;
-    }  
-    ft.draw();
-  }
+  });
 }
 
 function restartESP() {
@@ -1584,13 +1674,15 @@ function socketMessageListener(evt) {
     switch (obj.command) {
       case "status":
         ajaxobj = obj;
-        getContent("#statuscontent");
+        if (currentContent === "" || currentContent === "#statuscontent") {
+          getContent("#statuscontent");
+        }
         break;
       case "userlist":
         haspages = obj.haspages;
         if (haspages === 0) {
           if (!backupstarted) {
-            document.getElementById("loading-img").style.display = "none";
+            hideLoadingBar();
             initUserTable();
             $(".footable-show").click();
             $(".fooicon-remove").click();
@@ -1602,7 +1694,7 @@ function socketMessageListener(evt) {
       case "eventlist":
         haspages = obj.haspages;
         if (haspages === 0) {
-          document.getElementById("loading-img").style.display = "none";
+          hideLoadingBar();
           initEventTable();
           break;
         }
@@ -1611,7 +1703,7 @@ function socketMessageListener(evt) {
       case "latestlist":
         haspages = obj.haspages;
         if (haspages === 0) {
-          document.getElementById("loading-img").style.display = "none";
+          hideLoadingBar();
           initLatestLogTable();
           break;
         }
@@ -1620,7 +1712,7 @@ function socketMessageListener(evt) {
       case "listfiles":
         haspages = obj.haspages;
         if (haspages === 0) {
-            document.getElementById("loading-img").style.display = "none";
+            hideLoadingBar();
             initFileListTable();
             break;
           }
@@ -1662,7 +1754,7 @@ function socketMessageListener(evt) {
         if (obj.result === false) {
           logdata = [];
           initLatestLogTable();
-          document.getElementById("loading-img").style.display = "none";
+          hideLoadingBar();
         }
         break;
       case "userlist":
@@ -1671,7 +1763,7 @@ function socketMessageListener(evt) {
         } else if (page === haspages) {
           if (!backupstarted) {
             initUserTable();
-            document.getElementById("loading-img").style.display = "none";
+            hideLoadingBar();
 
             $(".footable-show").click();
             $(".fooicon-remove").click();
@@ -1697,7 +1789,7 @@ function socketMessageListener(evt) {
           if (theCurrentLogFile === "/eventlog.json") {
             document.getElementById("cleareventlogbtn").disabled=false;
           }
-          document.getElementById("loading-img").style.display = "none";
+          hideLoadingBar();
         }
         break;
       case "latestlist":
@@ -1712,7 +1804,7 @@ function socketMessageListener(evt) {
           {
             document.getElementById("clearlatestlogbtn").disabled=false; 
           } 
-          document.getElementById("loading-img").style.display = "none";
+          hideLoadingBar();
         }
         break;
       case "listfiles":
@@ -1720,7 +1812,7 @@ function socketMessageListener(evt) {
           getnextpage("listfiles");
         } else if (page === haspages) {
           initFileListTable();
-          document.getElementById("loading-img").style.display = "none";
+          hideLoadingBar();
         }
         break;
       case "logfileMaintenance":
@@ -1844,17 +1936,19 @@ function updateRelayForm() {
 }
 
 function updateUserModalForm(){
-  if(config.hardware.doorname) {
+  if (config && config.hardware && config.hardware.doorname) {
     $("#useracctype label").text("Access to " + config.hardware.doorname);
   }
 
+  var accTypeForm = $("#useracctype");
+  var accParent = $("#usermodalbody");
+  if (!accTypeForm.length || !accParent.length) return;
+
   for (var i=2; i<= maxNumRelays; i++) {
-    var accTypeForm = $("#useracctype");
-    var accParent= $("#usermodalbody");
     if (i<= numRelays) 
     {
       var existingaccTypeForm = document.getElementById("useracctype" + i);
-      if (!(existingaccTypeForm))
+      if (!existingaccTypeForm && accTypeForm[0])
       {
         var accTypeFormClone = accTypeForm.clone(true);
         var cloneObj = accTypeFormClone[0];
@@ -1865,13 +1959,13 @@ function updateUserModalForm(){
         str=str.replace("Access Type Relay 1", "Access Type Relay "+i);
         str=str.replace ("<option value=\"99\">Admin 24/7</option>", "");
         cloneObj.innerHTML=str;
-        accParent[0].appendChild(cloneObj);
-        var rname = (config.hardware["relay"+i] && config.hardware["relay"+i].doorname) ? config.hardware["relay"+i].doorname : "Relay "+i;
+        if (accParent[0]) accParent[0].appendChild(cloneObj);
+        var rname = (config.hardware && config.hardware["relay"+i] && config.hardware["relay"+i].doorname) ? config.hardware["relay"+i].doorname : "Relay "+i;
         $("#useracctype"+i+" label").text("Access to " + rname);
       }
     } else {
       var removeAccForm = document.getElementById("useracctype" + i);
-      if (removeAccForm)
+      if (removeAccForm && accParent[0])
       {
         accParent[0].removeChild(removeAccForm);
       }
@@ -1920,6 +2014,7 @@ $("#status").click(function() {
   document.getElementById("libackup").classList.remove("active");
   document.getElementById("lireset").classList.remove("active");
   document.getElementById("liupdate").classList.remove("active");
+  currentContent = "#statuscontent";
   sendWebsocket("{\"command\":\"status\"}");
   return false;
 });
@@ -2062,6 +2157,7 @@ $("#users").click(function() {
   document.getElementById("lireset").classList.remove("active");
   document.getElementById("liupdate").classList.remove("active");
   getContent("#userscontent");
+  return false;
 });
 $("#latestlog").click(function() {
   document.getElementById("listatus").classList.remove("active");
@@ -2278,8 +2374,9 @@ function wsConnectionActive() {
 
 function wsConnectionClosed() {
   wsConnectionPresent = false;
+  gotInitialData = false;
   // $("#ws-connection-status").slideDown();
-  connectWS();
+  setTimeout(connectWS, 1000);
 }
 
 function keepWSConnectionOpen() {
@@ -2290,6 +2387,10 @@ function keepWSConnectionOpen() {
 
 function connectWS() {
   if(wsConnectionPresent) {
+    return;
+  }
+  // Already connecting? Don't pile up duplicate sockets on the ESP.
+  if (websock && websock.readyState === 0) {
     return;
   }
 
@@ -2375,9 +2476,22 @@ $("#update").on("shown.bs.modal", function(e) {
   getLatestReleaseInfo();
 });
 
-function allowUpload() {
-  $("#upbtn").prop("disabled", false);
-}
+$(document).on("mouseenter focus click", "[data-toggle='popover']", function(e) {
+  var $this = $(this);
+  if (!$this.data("bs.popover")) {
+    $this.popover({
+      container: "body",
+      trigger: "manual",
+      placement: "auto"
+    });
+  }
+  $this.popover("show");
+}).on("mouseleave blur", "[data-toggle='popover']", function(e) {
+  var $this = $(this);
+  if ($this.data("bs.popover")) {
+    $this.popover("hide");
+  }
+});
 
 function start() {
   esprfidcontent = document.createElement("div");

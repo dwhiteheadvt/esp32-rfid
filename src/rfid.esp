@@ -73,7 +73,10 @@ void ICACHE_FLASH_ATTR wiegandRead()
 			File file = dir.openNextFile();
 			while (file)
 			{
-				if (String(file.name()) == uid)
+				String fname = String(file.name());
+				int lastSlash = fname.lastIndexOf('/');
+				if (lastSlash >= 0) fname = fname.substring(lastSlash + 1);
+				if (fname == uid)
 				{
 					usrfound = true;
 #ifdef DEBUG
@@ -92,8 +95,9 @@ void ICACHE_FLASH_ATTR wiegandRead()
 				Serial.println(F("[ DEBUG ] UserFile opened"));
 #endif
 				size_t size = f.size();
-				std::unique_ptr<char[]> buf(new char[size]);
+				std::unique_ptr<char[]> buf(new char[size + 1]);
 				f.readBytes(buf.get(), size);
+				buf.get()[size] = '\0';
 				f.close();
 				//DynamicJsonDocument json(512);
 				JsonDocument json;
@@ -445,7 +449,7 @@ void rfidOutsideMessaging()
 		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
 		if (buffer)
 		{
-			serializeJson(root, (char *)buffer->get(), len + 1);
+			serializeJson(root, (char *)buffer->get(), len);
 			ws.textAll(buffer);
 		}
 		mqttPublishAccess(epoch, "false", "Denied", "Unknown", uid, " ");
@@ -466,7 +470,7 @@ void rfidOutsideMessaging()
 		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
 		if (buffer)
 		{
-			serializeJson(root, (char *)buffer->get(), len + 1);
+			serializeJson(root, (char *)buffer->get(), len);
 			ws.textAll(buffer);
 		}
 	}
@@ -508,12 +512,16 @@ void rfidLoop()
 
 void ICACHE_FLASH_ATTR setupWiegandReader(int d0, int d1, bool removeParityBits)
 {
+	pinMode(d0, INPUT_PULLUP);
+	pinMode(d1, INPUT_PULLUP);
 	wg.begin(d0, d1, 58, 25); //58bit
 	rfidState = waitingRfid;
 }
 
 void ICACHE_FLASH_ATTR setupWiegandReader(int d0, int d1, bool removeParityBits, int wiegandbits)
 {
-	wg.begin(d0, d1, wiegandbits, 25); 
+	pinMode(d0, INPUT_PULLUP);
+	pinMode(d1, INPUT_PULLUP);
+	wg.begin(d0, d1, 58, 25); // Always use 58-bit max so WiegandNG captures 24, 26, 32, 34, 37, 56, and 58 bit cards
 	rfidState = waitingRfid;
 }

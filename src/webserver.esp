@@ -42,7 +42,7 @@ void setupWebServer() {
     });
 
     // Debug endpoint: lists all files in LittleFS
-    // Access at http://192.168.0.32/fsinfo
+    // Access at http://<device-ip>/fsinfo
     server.on("/fsinfo", HTTP_GET, [](AsyncWebServerRequest *request) {
         String output = "{\n  \"files\": [\n";
         std::function<void(File, bool&)> listDir = [&](File dir, bool &first) {
@@ -133,13 +133,15 @@ void setupWebServer() {
         }
     });
     server.on("/js/esprfid.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response;
         if (LittleFS.exists("/js/esprfid.js")) {
-            request->send(LittleFS, "/js/esprfid.js", "text/javascript");
+            response = request->beginResponse(LittleFS, "/js/esprfid.js", "text/javascript");
         } else {
-            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", esprfid_js_gz, esprfid_js_gz_len);
+            response = request->beginResponse_P(200, "text/javascript", esprfid_js_gz, esprfid_js_gz_len);
             response->addHeader("Content-Encoding", "gzip");
-            request->send(response);
         }
+        response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        request->send(response);
     });
     server.on("/js/boards.js", HTTP_GET, [](AsyncWebServerRequest *request) {
         if (LittleFS.exists("/js/boards.js")) {
@@ -151,25 +153,29 @@ void setupWebServer() {
         }
     });
     server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response;
         if (LittleFS.exists("/index.html")) {
-            request->send(LittleFS, "/index.html", "text/html");
+            response = request->beginResponse(LittleFS, "/index.html", "text/html");
         } else {
-            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
+            response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
             response->addHeader("Content-Encoding", "gzip");
-            request->send(response);
         }
+        response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        request->send(response);
     });
     server.on("/esprfid.htm", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response;
         if (LittleFS.exists("/esprfid.htm")) {
-            request->send(LittleFS, "/esprfid.htm", "text/html");
+            response = request->beginResponse(LittleFS, "/esprfid.htm", "text/html");
         } else {
-            AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", esprfid_htm_gz, esprfid_htm_gz_len);
+            response = request->beginResponse_P(200, "text/html", esprfid_htm_gz, esprfid_htm_gz_len);
             response->addHeader("Content-Encoding", "gzip");
-            request->send(response);
         }
+        response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        request->send(response);
     });
 
-    // Catch-all for any other LittleFS files (gymdoor-theme.css, img/logo.png, etc.)
+    // Catch-all for any other LittleFS files (css, images, etc.)
     server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
     server.rewrite("/", "/index.html");

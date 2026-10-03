@@ -378,7 +378,9 @@ void ICACHE_RAM_ATTR loop()
 #ifdef DEBUG
 		Serial.println(F("[ INFO ] System is going to reboot..."));
 #endif
+		delay(300);
 		LittleFS.end();
+		delay(300);
 		ESP.restart();
 	}
 

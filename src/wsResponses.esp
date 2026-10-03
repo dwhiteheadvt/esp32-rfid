@@ -22,23 +22,28 @@ void sendUserList(int page, AsyncWebSocketClient *client)
 		if (i >= first && i < last)
 		{
 			JsonObject item = users.createNestedObject();
-			String uid = file.name();
-			//uid.remove(0, 3);
+			String fname = String(file.name());
+			int lastSlash = fname.lastIndexOf('/');
+			if (lastSlash >= 0) fname = fname.substring(lastSlash + 1);
+			String uid = fname;
 			item["uid"] = uid;
-			File f = LittleFS.open("/P/"+uid, "r");
-			size_t size = f.size();
-			std::unique_ptr<char[]> buf(new char[size]);
-			f.readBytes(buf.get(), size);
+			File f = LittleFS.open("/P/" + uid, "r");
+			if (f)
+			{
+				size_t size = f.size();
+				std::unique_ptr<char[]> buf(new char[size + 1]);
+				f.readBytes(buf.get(), size);
+				buf.get()[size] = '\0';
 #ifdef DEBUG
 		Serial.print(F("[ INFO ] User File Name: "));
 		Serial.println(uid);
 		Serial.print(F("[ INFO ] User File Size: "));
-		Serial.println(file.size());
+		Serial.println(f.size());
 		Serial.print(F("[ INFO ] User File "));
 #endif
-			//DynamicJsonDocument json(512);
-			JsonDocument json;
-			auto error = deserializeJson(json, buf.get(), size);
+				//DynamicJsonDocument json(512);
+				JsonDocument json;
+				auto error = deserializeJson(json, buf.get(), size);
 			if (!error)
 			{
 				String username = json["user"];
@@ -78,6 +83,8 @@ void sendUserList(int page, AsyncWebSocketClient *client)
 		Serial.println(F(" FAIL"));
 #endif
 			}
+				f.close();
+			}
 		}
 		i++;
 		file = dir.openNextFile();
@@ -90,7 +97,7 @@ void sendUserList(int page, AsyncWebSocketClient *client)
 	AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
 	if (buffer)
 	{
-		serializeJson(root, (char *)buffer->get(), len + 1);
+		serializeJson(root, (char *)buffer->get(), len);
 		if (client)
 		{
 			//wsMessageTicker.once_ms_scheduled(50, [client, buffer]() {
@@ -217,7 +224,7 @@ void sendStatus(AsyncWebSocketClient *client)
 	AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
 	if (buffer)
 	{
-		serializeJson(root, (char *)buffer->get(), len + 1);
+		serializeJson(root, (char *)buffer->get(), len);
 		if (client)
 		{
 			client->text(buffer);
@@ -270,7 +277,7 @@ void printScanResult(int networksFound)
 	AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len); //  creates a buffer (len + 1) for you.
 	if (buffer)
 	{
-		serializeJson(root, (char *)buffer->get(), len + 1);
+		serializeJson(root, (char *)buffer->get(), len);
 		ws.textAll(buffer);
 	}
 	WiFi.scanDelete();
@@ -286,7 +293,7 @@ void sendTime(AsyncWebSocketClient *client)
 	AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
 	if (buffer)
 	{
-		serializeJson(root, (char *)buffer->get(), len + 1);
+		serializeJson(root, (char *)buffer->get(), len);
 		if (client)
 		{
 			client->text(buffer);

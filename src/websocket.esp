@@ -74,9 +74,10 @@ void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 	// Check whatever the command is and act accordingly
 	if (strcmp(command, "remove") == 0)
 	{
-		const char *uid = root["uid"];
-		String filename = "/P/";
-		filename += uid;
+		String cleanUid = String(root["uid"] | "");
+		int lastSlash = cleanUid.lastIndexOf('/');
+		if (lastSlash >= 0) cleanUid = cleanUid.substring(lastSlash + 1);
+		String filename = "/P/" + cleanUid;
 		LittleFS.remove(filename);
 		ws.textAll("{\"command\":\"result\",\"resultof\":\"remove\",\"result\": true}");
 	}
@@ -160,10 +161,12 @@ void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 		serializeJson(root, Serial);
 		Serial.println("");
 #endif
-		const char *uid = root["uid"];
-		String filename = "/P/";
-		filename += uid;
-		File f = LittleFS.open(filename, "w"); //+
+		String cleanUid = String(root["uid"] | "");
+		int lastSlash = cleanUid.lastIndexOf('/');
+		if (lastSlash >= 0) cleanUid = cleanUid.substring(lastSlash + 1);
+		root["uid"] = cleanUid;
+		String filename = "/P/" + cleanUid;
+		File f = LittleFS.open(filename, "w");
 		// Check if we created the file
 		if (f)
 		{
